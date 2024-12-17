@@ -23,6 +23,8 @@ type kafkaStream struct {
 	cancel context.CancelFunc
 }
 
+//go:generate go run ./../../../cmd/config-gen/main.go -type KafkaConfig -file kafka_config_generated.go -module logstream
+
 func parseKafkaURL(u *url.URL) (kafka.ReaderConfig, error) {
 	config := kafka.ReaderConfig{
 		Brokers: []string{u.Host},
@@ -33,7 +35,9 @@ func parseKafkaURL(u *url.URL) (kafka.ReaderConfig, error) {
 		config.GroupID = u.User.Username()
 	}
 
-	// TODO: Add support for more kafka options from url query parameters.
+	if err := parseKafkaConfig(u, &config); err != nil {
+		return config, err
+	}
 
 	return config, config.Validate()
 }
