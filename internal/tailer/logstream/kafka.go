@@ -96,6 +96,11 @@ func (ks *kafkaStream) stream(ctx context.Context, wg *sync.WaitGroup, oneShot O
 				break
 			}
 
+			if IsExitableError(err) {
+				glog.V(2).Infof("stream(%s): exiting, conn has error %s", ks.sourcename, err)
+				break
+			}
+
 			if err != nil {
 				logErrors.Add(ks.sourcename, 1)
 				glog.V(2).Infof("stream(%s): read error: %v", ks.sourcename, err)
