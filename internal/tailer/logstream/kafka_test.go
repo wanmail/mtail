@@ -1,4 +1,4 @@
-package logstream
+package logstream_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/mtail/internal/logline"
+	"github.com/google/mtail/internal/tailer/logstream"
 	"github.com/google/mtail/internal/testutil"
 	"github.com/google/mtail/internal/waker"
 	"github.com/segmentio/kafka-go"
@@ -46,11 +47,11 @@ func TestKafkaStreamRead(t *testing.T) {
 
 	msg := "yo"
 
-	sourcename := fmt.Sprintf("%s://%s@%s/%s", KafkaScheme, consumerGroup, host, topic)
+	sourcename := fmt.Sprintf("%s://%s@%s/%s", logstream.KafkaScheme, consumerGroup, host, topic)
 
 	t.Log("sourcename", sourcename)
 
-	ks, err := New(ctx, &wg, waker, sourcename, OneShotDisabled)
+	ks, err := logstream.New(ctx, &wg, waker, sourcename, logstream.OneShotDisabled)
 	testutil.FatalIfErr(t, err)
 
 	expected := []*logline.LogLine{
