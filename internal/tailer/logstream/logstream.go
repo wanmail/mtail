@@ -85,6 +85,8 @@ func New(ctx context.Context, wg *sync.WaitGroup, waker waker.Waker, pathname st
 		return newDgramStream(ctx, wg, waker, u.Scheme, u.Host, oneShot)
 	case KafkaScheme:
 		return newKafkaStream(ctx, wg, u, oneShot)
+	case AWS3Scheme:
+		return newAWSS3Stream(ctx, wg, waker, u, oneShot)
 	case "", "file":
 		path = u.Path
 	}
