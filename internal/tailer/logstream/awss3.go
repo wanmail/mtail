@@ -1,6 +1,7 @@
 package logstream
 
 import (
+	"compress/gzip"
 	"context"
 	"errors"
 	"net/url"
@@ -41,6 +42,11 @@ func IsAWSExitableError(err error) bool {
 	return false
 }
 
+const (
+	PLAIN = "plain"
+	GZIP  = "gzip"
+)
+
 type s3BucketConfig struct {
 	config aws.Config
 
@@ -55,6 +61,8 @@ type s3BucketConfig struct {
 	lastModified time.Time
 
 	lastKey string
+
+	format string
 }
 
 type s3Stream struct {
@@ -99,6 +107,12 @@ func parseS3URL(u *url.URL) (s3BucketConfig, error) {
 
 	if lastKey := u.Query().Get("LastKey"); lastKey != "" {
 		config.lastKey = lastKey
+	}
+
+	if format := u.Query().Get("Format"); format != "" {
+		config.format = format
+	} else {
+		config.format = PLAIN
 	}
 
 	config.config, _ = cfg.LoadDefaultConfig(context.TODO())
@@ -209,7 +223,21 @@ func (fs *s3Stream) stream(ctx context.Context, wg *sync.WaitGroup, waker waker.
 
 					defer out.Body.Close()
 
-					lr := NewLineReader(*obj.Key, fs.lines, out.Body, defaultReadBufferSize, fs.cancel)
+					var lr *LineReader
+
+					switch fs.format {
+					case GZIP:
+						gr, err := gzip.NewReader(out.Body)
+						if err != nil {
+							logErrors.Add(fs.sourcename, 1)
+							glog.Infof("stream(%s): error creating gzip reader: %v", fs.sourcename, err)
+							continue
+						}
+
+						lr = NewLineReader(*obj.Key, fs.lines, gr, defaultReadBufferSize, fs.cancel)
+					default:
+						lr = NewLineReader(*obj.Key, fs.lines, out.Body, defaultReadBufferSize, fs.cancel)
+					}
 
 					n, err := lr.ReadAndSend(ctx)
 
