@@ -209,7 +209,7 @@ func (fs *s3Stream) stream(ctx context.Context, wg *sync.WaitGroup, waker waker.
 
 					defer out.Body.Close()
 
-					lr := NewLineReader(fs.sourcename, fs.lines, out.Body, defaultReadBufferSize, fs.cancel)
+					lr := NewLineReader(*obj.Key, fs.lines, out.Body, defaultReadBufferSize, fs.cancel)
 
 					n, err := lr.ReadAndSend(ctx)
 
