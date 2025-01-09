@@ -26,8 +26,9 @@ func TestKafkaStreamRead(t *testing.T) {
 	// refer to https://hub.docker.com/r/apache/kafka
 	host := os.Getenv("MTAIL_KAFKA_TEST_HOST")
 	if host == "" {
-		t.Log("use default kafka host")
-		host = "localhost:49092"
+		// t.Log("use default kafka host")
+		// host = "localhost:9092"
+		t.Skip("MTAIL_KAFKA_TEST_HOST not set")
 	}
 
 	topic := fmt.Sprintf("test-%d", rand.Intn(100))
