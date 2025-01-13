@@ -168,7 +168,10 @@ func (fs *s3Stream) stream(ctx context.Context, wg *sync.WaitGroup, waker waker.
 		for {
 			input := &s3.ListObjectsV2Input{
 				Bucket: &fs.bucket,
-				Prefix: &fs.prefix,
+			}
+
+			if fs.prefix != "" {
+				input.Prefix = &fs.prefix
 			}
 
 			if fs.lastKey != "" {
