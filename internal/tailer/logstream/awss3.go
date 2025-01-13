@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"io"
 	"net/url"
 	"regexp"
 	"strings"
@@ -145,7 +146,7 @@ func newAWSS3Stream(ctx context.Context, wg *sync.WaitGroup, waker waker.Waker, 
 		return nil, err
 	}
 
-	glog.V(2).Infof("newKafkaStream(%s): started stream", fs.sourcename)
+	glog.V(2).Infof("newAWSStream(%s): started stream", fs.sourcename)
 
 	return fs, nil
 }
@@ -235,21 +236,50 @@ func (fs *s3Stream) stream(ctx context.Context, wg *sync.WaitGroup, waker waker.
 							continue
 						}
 
+						defer gr.Close()
+
 						lr = NewLineReader(*obj.Key, fs.lines, gr, defaultReadBufferSize, fs.cancel)
 					default:
 						lr = NewLineReader(*obj.Key, fs.lines, out.Body, defaultReadBufferSize, fs.cancel)
 					}
 
-					n, err := lr.ReadAndSend(ctx)
+					for {
+						n, err := lr.ReadAndSend(ctx)
 
-					if n > 0 {
-						total += n
+						glog.V(2).Infof("stream(%s): read %d bytes, err is %v", fs.sourcename, n, err)
 
-						// No error implies there is more to read so restart the loop.
-						if err == nil && ctx.Err() == nil {
-							continue
+						if n > 0 {
+							total += n
+
+							// No error implies there is more to read so restart the loop.
+							if err == nil && ctx.Err() == nil {
+								continue
+							}
+						} else if n == 0 && total > 0 {
+							// `pipe(7)` tells us "If all file descriptors referring to the
+							// write end of a fifo have been closed, then an attempt to
+							// read(2) from the fifo will see end-of-file (read(2) will
+							// return 0)."  To avoid shutting down the stream at startup
+							// before any writer has connected to the fifo, condition on
+							// having read any bytes previously.
+							glog.V(2).Infof("stream(%s): exiting, 0 bytes read", fs.sourcename)
+							break
+						}
+
+						// Test to see if we should exit.
+						if IsExitableError(err) {
+							// Because we've opened in nonblocking mode, this Read can return
+							// straight away.  If there are no writers, it'll return EOF (per
+							// `pipe(7)` and `read(2)`.)  This is expected when `mtail` is
+							// starting at system init as the writer may not be ready yet.
+							if !(errors.Is(err, io.EOF) && total == 0) {
+								glog.V(2).Infof("stream(%s): exiting, stream has error %s", fs.sourcename, err)
+								break
+							}
 						}
 					}
+
+					lr.Finish(ctx)
 
 					if oneShot == OneShotEnabled {
 						glog.Infof("stream(%s): oneshot mode, exiting", fs.sourcename)
