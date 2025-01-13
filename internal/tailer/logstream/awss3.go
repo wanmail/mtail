@@ -193,6 +193,7 @@ func (fs *s3Stream) stream(ctx context.Context, wg *sync.WaitGroup, waker waker.
 
 					// Skip files that are older than the time or do not match the pattern.
 					if obj.LastModified.Before(fs.lastModified) || !fs.re.MatchString(*obj.Key) {
+						glog.V(2).Infof("stream(%s): skipping file (%s) (%v)", fs.sourcename, *obj.Key, obj.LastModified)
 						continue
 					}
 
